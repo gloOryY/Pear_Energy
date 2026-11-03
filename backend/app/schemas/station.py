@@ -115,6 +115,8 @@ class StationShort(BaseModel):
     tariff_start: Optional[Decimal] = None
     tariff_per_minute: Optional[Decimal] = None
     image_url: Optional[str] = None
+    connector_type: Optional[Any] = None
+    connectors: List[ConnectorResponse] = []
 
 
 class StationDetail(StationResponse):

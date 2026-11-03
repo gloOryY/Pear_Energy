@@ -192,5 +192,11 @@ export default function YaMapView({
     }
   }, [userLocation]);
 
-  return <div ref={containerRef} className="w-full h-full min-h-[500px] rounded-2xl overflow-hidden" />;
+  return ( 
+    <div
+      ref={containerRef}
+      suppressHydrationWarning
+      className="w-full h-full min-h-[500px] rounded-2xl overflow-hidden"
+    />
+  );
 }

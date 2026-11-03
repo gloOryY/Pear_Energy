@@ -1,7 +1,8 @@
-from datetime import datetime
+﻿from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import Column, String, Numeric, Boolean, DateTime, Enum as SAEnum, JSON
 
 from app.db.base import Base, TimestampMixin
 from app.models.enums import ConnectorType, StationStatus
@@ -12,10 +13,10 @@ class Station(Base, TimestampMixin):
 
     id: Mapped[str] = mapped_column(primary_key=True)
     location_id: Mapped[str] = mapped_column(ForeignKey("locations.id"), index=True)
-    public_id: Mapped[str] = mapped_column(String(32), unique=True, index=True)  # CP-MSK-001, на QR-коде
+    public_id: Mapped[str] = mapped_column(String(32), unique=True, index=True)  # CP-MSK-001, РЅР° QR-РєРѕРґРµ
     name: Mapped[str] = mapped_column(String(255))
     serial_number: Mapped[str] = mapped_column(String(64), unique=True)
-    device_token: Mapped[str] = mapped_column(String(128))  # токен железа (в проде хранить хэш)
+    device_token: Mapped[str] = mapped_column(String(128))  # С‚РѕРєРµРЅ Р¶РµР»РµР·Р° (РІ РїСЂРѕРґРµ С…СЂР°РЅРёС‚СЊ С…СЌС€)
     connector_type: Mapped[ConnectorType] = mapped_column(
         Enum(ConnectorType, name="connector_type_enum"), default=ConnectorType.type2
     )
@@ -23,15 +24,15 @@ class Station(Base, TimestampMixin):
     max_current_a: Mapped[float] = mapped_column(Numeric(6, 1), default=32.0)
     status: Mapped[StationStatus] = mapped_column(Enum(StationStatus, name="station_status"), default=StationStatus.offline)
     
-    # Фотография станции
+    # Р¤РѕС‚РѕРіСЂР°С„РёСЏ СЃС‚Р°РЅС†РёРё
     image_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
 
-    # Тарификация
-    tariff_start: Mapped[float] = mapped_column(Numeric(10, 2), default=0.0)             # Разовая плата за старт
-    tariff_per_minute: Mapped[float] = mapped_column(Numeric(10, 2), default=0.0)        # Поминутная оплата зарядки
-    tariff_per_kwh: Mapped[float] = mapped_column(Numeric(10, 2), default=0.0)           # Оплата за кВт·ч
-    tariff_per_minute_idle: Mapped[float] = mapped_column(Numeric(10, 2), default=0.0)   # Плата за простой
-    min_launch_amount: Mapped[float] = mapped_column(Numeric(10, 2), default=100.0)      # Мин. баланс для активации
+    # РўР°СЂРёС„РёРєР°С†РёСЏ
+    tariff_start: Mapped[float] = mapped_column(Numeric(10, 2), default=0.0)             # Р Р°Р·РѕРІР°СЏ РїР»Р°С‚Р° Р·Р° СЃС‚Р°СЂС‚
+    tariff_per_minute: Mapped[float] = mapped_column(Numeric(10, 2), default=0.0)        # РџРѕРјРёРЅСѓС‚РЅР°СЏ РѕРїР»Р°С‚Р° Р·Р°СЂСЏРґРєРё
+    tariff_per_kwh: Mapped[float] = mapped_column(Numeric(10, 2), default=0.0)           # РћРїР»Р°С‚Р° Р·Р° РєР’С‚В·С‡
+    tariff_per_minute_idle: Mapped[float] = mapped_column(Numeric(10, 2), default=0.0)   # РџР»Р°С‚Р° Р·Р° РїСЂРѕСЃС‚РѕР№
+    min_launch_amount: Mapped[float] = mapped_column(Numeric(10, 2), default=100.0)      # РњРёРЅ. Р±Р°Р»Р°РЅСЃ РґР»СЏ Р°РєС‚РёРІР°С†РёРё
     booking_amount: Mapped[float] = mapped_column(Numeric(10, 2), default=0.0)
     
     supports_booking: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -42,6 +43,8 @@ class Station(Base, TimestampMixin):
     longitude: Mapped[float] = mapped_column(Numeric(9, 6))
 
     location = relationship("Location", back_populates="stations")
+    connectors = relationship("Connector", back_populates="station", cascade="all, delete-orphan", lazy="selectin")
+
     connectors = relationship("Connector", back_populates="station", cascade="all, delete-orphan", lazy="selectin")
 
 

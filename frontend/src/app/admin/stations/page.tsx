@@ -293,28 +293,30 @@ export default function AdminStationsPage() {
     const lonNum = parseFloat(longitude.replace(",", "."));
     const totalPower = parseFloat(maxPowerKw) || 22.0;
 
-    const newStation = {
-      name,
-      latitude: latNum,
-      longitude: lonNum,
-      address,
-      city: address.split(",")[0]?.trim() || "Рязань",
-      status: "available",
-      max_power_kw: totalPower,
-      image_url: imageUrl || null,
-      tariff_start: parseFloat(tariffStart) || 0.0,
-      tariff_per_minute: parseFloat(tariffPerMinute) || 0.0,
-      tariff_per_kwh: 0.0,
-      connectors: selectedConnectors.map((cType, idx) => {
-        const option = CONNECTOR_OPTIONS.find((o) => o.value === cType);
-        return {
-          connector_number: idx + 1,
-          type: cType,
-          max_power_kw: Math.min(totalPower, option?.defaultKw || totalPower),
-          status: "available",
-        };
-      }),
-    };
+  const newStation = {
+    name,
+    latitude: latNum,
+    longitude: lonNum,
+    address,
+    city: address.split(",")[0]?.trim() || "Рязань",
+    status: "available",
+    max_power_kw: totalPower,
+    image_url: imageUrl || null,
+    tariff_start: parseFloat(tariffStart) || 0.0,
+    tariff_per_minute: parseFloat(tariffPerMinute) || 0.0,
+    tariff_per_kwh: 0.0,
+    // Синхронизируем базовый тип с первым выбранным разъёмом:
+    connector_type: selectedConnectors[0] || "schuko",
+    connectors: selectedConnectors.map((cType, idx) => {
+      const option = CONNECTOR_OPTIONS.find((o) => o.value === cType);
+      return {
+        connector_number: idx + 1,
+        type: cType,
+        max_power_kw: Math.min(totalPower, option?.defaultKw || totalPower),
+        status: "available",
+      };
+    }),
+  };
 
     try {
       const res = await apiFetch("/stations", {
