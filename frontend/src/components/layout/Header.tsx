@@ -1,65 +1,100 @@
-'use client';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { Zap, MapPin, User, LayoutDashboard, LogOut, Menu } from 'lucide-react';
-import { useState } from 'react';
-import { useAuth } from '../../stores/auth';
-import { Button } from '../ui';
-import { post } from '../../lib/api';
+"use client";
+
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function Header() {
-  const { user, accessToken, clear } = useAuth();
   const router = useRouter();
-  const [open, setOpen] = useState(false);
-  const logout = async () => {
-    try { await post('auth/logout', { refresh_token: useAuth.getState().refreshToken }); } catch { clear(); }
-    router.push('/');
+  const [userDisplayName, setUserDisplayName] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false); // Флаг для решения Hydration Error
+
+  useEffect(() => {
+    setMounted(true); // Компонент загружен в браузере
+    const checkAuth = () => {
+      const token = localStorage.getItem("token");
+      const email = localStorage.getItem("userEmail");
+      const name = localStorage.getItem("userName");
+      
+      if (token && email) {
+        setUserDisplayName(name || email.split('@')[0]);
+        setUserEmail(email);
+      } else {
+        setUserDisplayName(null);
+        setUserEmail(null);
+      }
+    };
+
+    checkAuth();
+    window.addEventListener("auth-change", checkAuth);
+    return () => window.removeEventListener("auth-change", checkAuth);
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("userEmail");
+    localStorage.removeItem("userName");
+    localStorage.removeItem("userPhone");
+    window.dispatchEvent(new Event("auth-change"));
+    router.push("/");
   };
-  const cabinetHref = user?.role === 'admin' ? '/admin' : user?.role === 'operator' ? '/operator' : '/account';
+
   return (
-    <header className="sticky top-0 z-50 border-b border-graphite-700 bg-graphite-900/90 backdrop-blur">
-      <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
-        <Link href="/" className="flex items-center gap-2 font-bold text-lg">
-          <span className="w-9 h-9 rounded-xl bg-accent flex items-center justify-center"><Zap size={20} className="text-graphite-950" /></span>
-          <span>ChargePoint</span><span className="text-accent">Road</span>
-        </Link>
-        <nav className="hidden md:flex items-center gap-6 text-sm">
-          <Link href="/map" className="flex items-center gap-1.5 text-zinc-300 hover:text-accent"><MapPin size={16} />Карта</Link>
-          {accessToken ? (
-            <Link href={cabinetHref} className="flex items-center gap-1.5 text-zinc-300 hover:text-accent"><LayoutDashboard size={16} />Кабинет</Link>
-          ) : null}
-        </nav>
-        <div className="hidden md:block">
-          {accessToken ? (
-            <div className="flex items-center gap-3">
-              <Link href={cabinetHref}><Button variant="secondary" className="!py-2 !px-4"><User size={16} className="mr-1 inline" />{user?.full_name?.split(' ')[0]}</Button></Link>
-              <button onClick={logout} aria-label="Выйти" className="p-2 rounded-lg hover:bg-graphite-700 text-zinc-400"><LogOut size={18} /></button>
+    <header className="bg-gray-800 text-white p-4 flex justify-between items-center shadow-lg border-b border-gray-700">
+      <Link href="/" className="text-xl font-bold text-green-400 flex items-center gap-2 hover:text-green-300 transition-colors">
+        <span>⚡ Pear Energy</span>
+      </Link>
+      
+      <nav className="flex items-center gap-6">
+        <Link href="/map" className="text-sm font-medium text-gray-300 hover:text-green-400 transition">Карта</Link>
+        {/* Кнопка "Станции" удалена */}
+        
+        {/* Предотвращаем разницу между сервером и клиентом: пока компонент не смонтирован, не рендерим часть с авторизацией */}
+        {mounted ? (
+          userDisplayName ? (
+            <div className="flex items-center gap-4 ml-2 pl-6 border-l border-gray-600">
+              
+              {/* Показываем доступ к управлению станциями только для админа */}
+              {userEmail === "admin@example.com" && (
+                <Link href="/admin/stations" className="px-3 py-1.5 bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500 hover:text-gray-900 rounded-lg text-sm font-bold transition-colors">
+                  Панель управления
+                </Link>
+              )}
+
+              <Link 
+                href="/profile" 
+                className="group flex items-center gap-3 hover:bg-gray-700 py-1.5 px-3 rounded-lg transition-all"
+              >
+                <div className="w-8 h-8 bg-gray-700 group-hover:bg-green-500 rounded-full flex items-center justify-center text-green-400 group-hover:text-gray-900 font-bold transition-colors">
+                  {userDisplayName.charAt(0).toUpperCase()}
+                </div>
+                <span className="hidden sm:inline text-sm font-medium text-gray-200 group-hover:text-white transition-colors">
+                  Здравствуйте, {userDisplayName}
+                </span>
+              </Link>
+              <button 
+                onClick={handleLogout}
+                className="px-4 py-2 bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                Выйти
+              </button>
             </div>
           ) : (
-            <div className="flex gap-2">
-              <Link href="/auth/login"><Button variant="secondary" className="!py-2">Войти</Button></Link>
-              <Link href="/auth/register"><Button className="!py-2">Регистрация</Button></Link>
+            <div className="flex gap-3 ml-2 pl-6 border-l border-gray-600">
+              <Link href="/auth/login" className="px-5 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm font-medium transition-colors">
+                Войти
+              </Link>
+              <Link href="/auth/register" className="px-5 py-2 bg-green-500 hover:bg-green-400 text-gray-900 rounded-lg text-sm font-bold transition-colors">
+                Регистрация
+              </Link>
             </div>
-          )}
-        </div>
-        <button className="md:hidden p-2" onClick={() => setOpen(!open)} aria-label="Меню"><Menu /></button>
-      </div>
-      {open && (
-        <div className="md:hidden border-t border-graphite-700 px-4 py-4 flex flex-col gap-3">
-          <Link href="/map" onClick={() => setOpen(false)}>Карта</Link>
-          {accessToken ? (
-            <Link href={cabinetHref} onClick={() => setOpen(false)}>Кабинет</Link>
-          ) : null}
-          {accessToken ? (
-            <Button variant="secondary" onClick={logout}>Выйти</Button>
-          ) : (
-            <>
-              <Link href="/auth/login"><Button variant="secondary" className="w-full">Войти</Button></Link>
-              <Link href="/auth/register"><Button className="w-full">Регистрация</Button></Link>
-            </>
-          )}
-        </div>
-      )}
+          )
+        ) : (
+          /* Скелетон (заглушка) во время первой загрузки страницы, чтобы избежать ошибки Hydration */
+          <div className="w-48 h-10 bg-gray-700 animate-pulse rounded-lg ml-2 pl-6 border-l border-gray-600"></div>
+        )}
+      </nav>
     </header>
   );
 }

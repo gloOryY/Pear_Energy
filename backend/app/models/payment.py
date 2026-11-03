@@ -1,3 +1,4 @@
+from sqlalchemy import JSON
 from datetime import datetime
 from decimal import Decimal
 
@@ -49,7 +50,10 @@ class PaymentWebhook(Base, TimestampMixin):
     provider: Mapped[str] = mapped_column(String(32), index=True)
     event_type: Mapped[str] = mapped_column(String(64))
     provider_payment_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
-    payload: Mapped[dict] = mapped_column(default=dict)
+    payload: Mapped[dict] = mapped_column(
+    JSON,
+    nullable=False,
+    default=dict,)
     processed: Mapped[bool] = mapped_column(default=False)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
@@ -71,4 +75,4 @@ class Receipt(Base, TimestampMixin):
     payment_id: Mapped[str] = mapped_column(ForeignKey("payments.id"), index=True)
     session_id: Mapped[str | None] = mapped_column(index=True)
     number: Mapped[str] = mapped_column(String(32), unique=True)
-    data: Mapped[dict] = mapped_column(default=dict)
+    data: Mapped[dict] = mapped_column(JSON, default=dict)

@@ -1,5 +1,6 @@
 from sqlalchemy import Boolean, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import JSON
 
 from app.db.base import Base, TimestampMixin
 
@@ -12,7 +13,7 @@ class AuditLog(Base, TimestampMixin):
     action: Mapped[str] = mapped_column(String(64), index=True)  # payment.succeeded, command.start ...
     entity_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
     entity_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    meta: Mapped[dict] = mapped_column(default=dict)
+    meta: Mapped[dict] = mapped_column(JSON, nullable=True)
 
 
 class Review(Base, TimestampMixin):

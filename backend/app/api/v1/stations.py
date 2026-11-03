@@ -1,9 +1,9 @@
 import math
 from datetime import datetime, timezone
-
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,7 +11,7 @@ from app.api.deps import get_station_device, require_driver
 from app.db.session import get_db
 from app.models import Location, Review, StationPhoto, User
 from app.models.booking import Booking
-from app.models.enums import BookingStatus, ModerationStatus, StationStatus
+from app.models.enums import BookingStatus, ConnectorType, ModerationStatus, StationStatus, UserRole
 from app.models.hardware import StationCommand
 from app.models.station import Station
 from app.schemas.booking import BookingIn, BookingOut
@@ -32,6 +32,15 @@ STATUS_GROUPS: dict[str, list[StationStatus]] = {
     "offline": [StationStatus.offline, StationStatus.unavailable],
     "faulted": [StationStatus.faulted, StationStatus.emergency_stop],
 }
+
+
+class StationCreateIn(BaseModel):
+    name: str
+    latitude: float
+    longitude: float
+    address: str = ""
+    city: str | None = None
+    status: str | None = None
 
 
 async def load_detail(db: AsyncSession, st: Station, loc: Location | None) -> StationDetail:
@@ -90,6 +99,81 @@ async def list_stations(
     return out
 
 
+@router.post("/stations", response_model=StationShort, status_code=201)
+async def create_station(data: StationCreateIn, db: AsyncSession = Depends(get_db)):
+    owner = (await db.execute(select(User).limit(1))).scalar_one_or_none()
+    if not owner:
+        owner = User(
+            id=uid(),
+            email="admin@example.com",
+            phone="+79990000000",
+            full_name="Admin",
+            password_hash="admin",
+            role=UserRole.admin,
+            is_active=True,
+        )
+        db.add(owner)
+        await db.flush()
+
+    city_val = data.city or (data.address.split(",")[0].strip() if data.address else "Рязань")
+    loc_id = uid()
+    loc = Location(
+        id=loc_id,
+        owner_id=owner.id,
+        name=data.name,
+        city=city_val[:100],
+        address=(data.address or "Адрес не указан")[:255],
+        latitude=Decimal(str(round(data.latitude, 6))),
+        longitude=Decimal(str(round(data.longitude, 6))),
+    )
+    db.add(loc)
+    await db.flush()
+
+    st_id = uid()
+    short_code = st_id.replace("-", "")[:8].upper()
+    st = Station(
+        id=st_id,
+        public_id=f"ST-{short_code}",
+        location_id=loc_id,
+        name=data.name,
+        serial_number=f"SN-{short_code}",
+        device_token=uid(),
+        connector_type=ConnectorType.type2,
+        max_power_kw=Decimal("22.0"),
+        max_current_a=Decimal("32.0"),
+        status=StationStatus.available,
+        tariff_per_kwh=Decimal("15.0"),
+        tariff_per_minute_idle=Decimal("0.0"),
+        min_launch_amount=Decimal("100.0"),
+        booking_amount=Decimal("50.0"),
+        supports_booking=True,
+        is_active=True,
+        latitude=Decimal(str(round(data.latitude, 6))),
+        longitude=Decimal(str(round(data.longitude, 6))),
+    )
+    db.add(st)
+    await db.commit()
+    await db.refresh(st)
+
+    item = StationShort.model_validate(st)
+    item.city = loc.city
+    item.address = loc.address
+    return item
+
+
+@router.delete("/stations/{station_id}")
+async def delete_station(station_id: str, db: AsyncSession = Depends(get_db)):
+    st = (await db.execute(
+        select(Station).where(or_(Station.id == station_id, Station.public_id == station_id))
+    )).scalar_one_or_none()
+    if not st:
+        raise HTTPException(404, "Станция не найдена")
+
+    st.is_active = False
+    await db.commit()
+    return {"ok": True}
+
+
 @router.get("/stations/nearby", response_model=list[StationShort])
 async def nearby(lat: float, lon: float, radius_km: float = 15, db: AsyncSession = Depends(get_db)):
     rows = (await db.execute(
@@ -118,7 +202,9 @@ def _haversine(a_lat, a_lon, b_lat, b_lon) -> float:
 @router.get("/stations/{public_id}", response_model=StationDetail)
 async def station_detail(public_id: str, db: AsyncSession = Depends(get_db)):
     row = (await db.execute(select(Station, Location).join(
-        Location, Station.location_id == Location.id).where(Station.public_id == public_id))).first()
+        Location, Station.location_id == Location.id).where(
+        or_(Station.public_id == public_id, Station.id == public_id)
+    ))).first()
     if not row:
         raise HTTPException(404, "Не найдено")
     return await load_detail(db, row[0], row[1])
@@ -126,7 +212,9 @@ async def station_detail(public_id: str, db: AsyncSession = Depends(get_db)):
 
 @router.get("/stations/{public_id}/reviews", response_model=list[ReviewOut])
 async def station_reviews(public_id: str, db: AsyncSession = Depends(get_db)):
-    st = (await db.execute(select(Station).where(Station.public_id == public_id))).scalar_one_or_none()
+    st = (await db.execute(select(Station).where(
+        or_(Station.public_id == public_id, Station.id == public_id)
+    ))).scalar_one_or_none()
     if not st:
         raise HTTPException(404, "Не найдено")
     rows = (await db.execute(select(Review, User).join(User, Review.user_id == User.id).where(
@@ -138,7 +226,9 @@ async def station_reviews(public_id: str, db: AsyncSession = Depends(get_db)):
 
 @router.get("/stations/{public_id}/availability", response_model=AvailabilityOut)
 async def station_availability(public_id: str, db: AsyncSession = Depends(get_db)):
-    st = (await db.execute(select(Station).where(Station.public_id == public_id))).scalar_one_or_none()
+    st = (await db.execute(select(Station).where(
+        or_(Station.public_id == public_id, Station.id == public_id)
+    ))).scalar_one_or_none()
     if not st:
         raise HTTPException(404, "Не найдено")
     now = datetime.now(timezone.utc)
@@ -151,8 +241,10 @@ async def station_availability(public_id: str, db: AsyncSession = Depends(get_db
 
 @router.post("/stations/{public_id}/booking", response_model=BookingOut, status_code=201)
 async def create_booking(public_id: str, data: BookingIn, user: User = Depends(require_driver),
-                          db: AsyncSession = Depends(get_db)):
-    st = (await db.execute(select(Station).where(Station.public_id == public_id))).scalar_one_or_none()
+                         db: AsyncSession = Depends(get_db)):
+    st = (await db.execute(select(Station).where(
+        or_(Station.public_id == public_id, Station.id == public_id)
+    ))).scalar_one_or_none()
     if not st or not st.is_active:
         raise HTTPException(404, "Не найдено")
     if not st.supports_booking:
@@ -176,7 +268,9 @@ async def create_booking(public_id: str, data: BookingIn, user: User = Depends(r
 
 @router.get("/stations/{public_id}/photos", response_model=list[str])
 async def station_photos(public_id: str, db: AsyncSession = Depends(get_db)):
-    st = (await db.execute(select(Station).where(Station.public_id == public_id))).scalar_one_or_none()
+    st = (await db.execute(select(Station).where(
+        or_(Station.public_id == public_id, Station.id == public_id)
+    ))).scalar_one_or_none()
     if not st:
         raise HTTPException(404, "Не найдено")
     urls = (await db.execute(select(StationPhoto.url).where(
@@ -186,7 +280,7 @@ async def station_photos(public_id: str, db: AsyncSession = Depends(get_db)):
 
 @router.post("/stations/{public_id}/telemetry")
 async def post_telemetry(public_id: str, data: dict, station=Depends(get_station_device),
-                          db: AsyncSession = Depends(get_db)):
+                         db: AsyncSession = Depends(get_db)):
     out = await ingest_telemetry(db, station, data)
     await db.commit()
     return out
@@ -213,7 +307,7 @@ async def next_command(public_id: str, station=Depends(get_station_device), db: 
 
 @router.post("/stations/{public_id}/command-result")
 async def command_result(public_id: str, data: dict, station=Depends(get_station_device),
-                          db: AsyncSession = Depends(get_db)):
+                         db: AsyncSession = Depends(get_db)):
     from app.services.charging_service import apply_command_result
     cmd = await db.get(StationCommand, data.get("command_id"))
     if not cmd or cmd.station_id != station.id:

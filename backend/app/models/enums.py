@@ -22,8 +22,12 @@ class StationStatus(str, enum.Enum):
 
 
 class ConnectorType(str, enum.Enum):
-    type2 = "Type 2"
-
+    type2 = "type2"
+    ccs2 = "ccs2"
+    chademo = "chademo"
+    gbt_dc = "gbt_dc"
+    gbt_ac = "gbt_ac"
+    schuko = "schuko"
 
 class SessionStatus(str, enum.Enum):
     awaiting_payment = "awaiting_payment"

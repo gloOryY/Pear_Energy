@@ -22,10 +22,18 @@ class Station(Base, TimestampMixin):
     max_power_kw: Mapped[float] = mapped_column(Numeric(6, 2))
     max_current_a: Mapped[float] = mapped_column(Numeric(6, 1), default=32.0)
     status: Mapped[StationStatus] = mapped_column(Enum(StationStatus, name="station_status"), default=StationStatus.offline)
-    tariff_per_kwh: Mapped[float] = mapped_column(Numeric(10, 2))
-    tariff_per_minute_idle: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
-    min_launch_amount: Mapped[float] = mapped_column(Numeric(10, 2), default=100)
-    booking_amount: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
+    
+    # Фотография станции
+    image_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+
+    # Тарификация
+    tariff_start: Mapped[float] = mapped_column(Numeric(10, 2), default=0.0)             # Разовая плата за старт
+    tariff_per_minute: Mapped[float] = mapped_column(Numeric(10, 2), default=0.0)        # Поминутная оплата зарядки
+    tariff_per_kwh: Mapped[float] = mapped_column(Numeric(10, 2), default=0.0)           # Оплата за кВт·ч
+    tariff_per_minute_idle: Mapped[float] = mapped_column(Numeric(10, 2), default=0.0)   # Плата за простой
+    min_launch_amount: Mapped[float] = mapped_column(Numeric(10, 2), default=100.0)      # Мин. баланс для активации
+    booking_amount: Mapped[float] = mapped_column(Numeric(10, 2), default=0.0)
+    
     supports_booking: Mapped[bool] = mapped_column(Boolean, default=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     parking_info: Mapped[str] = mapped_column(Text, default="")
