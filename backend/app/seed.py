@@ -4,10 +4,13 @@ from datetime import datetime, timezone
 import uuid
 
 from sqlalchemy import select
+from app.core.security import hash_password
 from app.db.session import async_session_maker
-from app.models.enums import ConnectorType, StationStatus
-from app.models.station import Station
-from app.models.hardware import Connector
+from app.models.enums import ConnectorType, StationStatus, UserRole
+from app.models.location import Location
+from app.models.station import Station, Connector
+from app.models.user import User
+from app.utils.ids import uid
 
 
 SEED_STATIONS = [
@@ -90,10 +93,77 @@ async def seed() -> None:
             print("Seed: данные уже есть, пропускаем")
             return
 
-        for data in SEED_STATIONS:
-            conns_data = data.pop("connectors")
+        # Проверяем / создаем базовых пользователей, если их нет
+        user_res = await session.execute(select(User).limit(1))
+        users = {}
+        if not user_res.scalar_one_or_none():
+            for email, name, role in [
+                ("driver@example.com", "Водитель Тест", UserRole.driver),
+                ("operator@example.com", "Оператор Тест", UserRole.operator),
+                ("admin@example.com", "Администратор Тест", UserRole.admin),
+            ]:
+                u = User(
+                    id=uid(),
+                    phone=f"+7900{email[:5].replace('@', '').ljust(6, '0')}",
+                    email=email,
+                    full_name=name,
+                    role=role,
+                    password_hash=hash_password("Password123!"),
+                )
+                session.add(u)
+                users[email] = u
+            await session.flush()
+        else:
+            op_user = (await session.execute(select(User).where(User.role == UserRole.operator).limit(1))).scalar_one_or_none()
+            if op_user:
+                users["operator@example.com"] = op_user
+            else:
+                first_user = (await session.execute(select(User).limit(1))).scalar_one()
+                users["operator@example.com"] = first_user
+
+        operator_id = users["operator@example.com"].id
+
+        loc_cache = {}
+        for s_idx, station_info in enumerate(SEED_STATIONS, 1):
+            data = dict(station_info)
+            conns_data = list(data.pop("connectors", []))
+            address = data.pop("address", "ул. Ленина, 1")
+            city = data.pop("city", "Рязань")
+            loc_key = (city, address)
+
+            if loc_key not in loc_cache:
+                loc = (await session.execute(
+                    select(Location).where(Location.city == city, Location.address == address).limit(1)
+                )).scalar_one_or_none()
+                if not loc:
+                    loc = Location(
+                        id=uid(),
+                        owner_id=operator_id,
+                        name=f"Локация {data.get('name', '')[:20]}",
+                        address=address,
+                        city=city,
+                        latitude=data.get("latitude", Decimal("54.634100")),
+                        longitude=data.get("longitude", Decimal("39.748200")),
+                        description=f"{data.get('name', '')}, {city}",
+                        amenities=["wc", "cafe", "wifi", "parking"],
+                        schedule={"always_open": True},
+                        venue_types=["parking"],
+                        photo_urls=[],
+                    )
+                    session.add(loc)
+                    await session.flush()
+                loc_cache[loc_key] = loc
+
+            loc = loc_cache[loc_key]
+            station_id = data.get("id", uid())
+            clean_code = station_id.replace("st_", "").upper()
+
             station = Station(
                 **data,
+                location_id=loc.id,
+                public_id=f"PUB_{clean_code}",
+                serial_number=f"SN-{clean_code}-{s_idx:03d}",
+                device_token=f"TOKEN_{clean_code}_{s_idx:03d}",
                 status=StationStatus.available,
                 max_current_a=Decimal("32.0"),
                 tariff_per_kwh=Decimal("0.00"),
@@ -102,8 +172,8 @@ async def seed() -> None:
                 booking_amount=Decimal("0.00"),
                 supports_booking=True,
                 is_active=True,
+                parking_info="",
                 created_at=now,
-                updated_at=now,
             )
             session.add(station)
             await session.flush()
@@ -117,7 +187,6 @@ async def seed() -> None:
                     max_power_kw=c["max_power_kw"],
                     status="available",
                     created_at=now,
-                    updated_at=now,
                 )
                 session.add(conn)
 

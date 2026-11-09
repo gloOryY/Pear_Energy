@@ -13,7 +13,7 @@ class PaymentCreateIn(BaseModel):
     return_url: str | None = None
 
 
-class ConfirmationOut(BaseModel):
+class ConfirmationOut(ORMModel):
     type: str
     sbp_payload: str | None = None
     url: str | None = None

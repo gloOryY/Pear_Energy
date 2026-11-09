@@ -1,13 +1,6 @@
 import pytest
 from tests.conftest import login
 
-pytestmark = pytest.mark.anyio
-
-
-@pytest.fixture
-def anyio_backend():
-    return "asyncio"
-
 
 async def test_register_login_me(client):
     r = await client.post(
@@ -32,7 +25,7 @@ async def test_stations_filters(client):
     assert r.status_code == 200
     assert len(r.json()) >= 2
     r = await client.get("/api/v1/stations", params={"power": ["p22"]})
-    assert all(s["max_power_kw"] >= 22.0 for s in r.json())
+    assert all(float(s["max_power_kw"]) >= 22.0 for s in r.json())
 
 
 async def test_full_charging_flow(client, driver_headers):

@@ -113,20 +113,41 @@ export default function HomePage() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white selection:bg-green-500 selection:text-gray-950">
-      <section className="relative border-b border-gray-800 bg-gradient-to-b from-gray-900 via-gray-900/50 to-gray-950 px-6 py-16 text-center">
-        <div className="mx-auto max-w-4xl space-y-4">
-          <span className="inline-block rounded-full bg-green-500/10 px-4 py-1.5 text-xs font-semibold text-green-400 border border-green-500/20">
+    <div
+      suppressHydrationWarning
+      className="min-h-screen bg-gray-950 text-white selection:bg-green-500 selection:text-gray-950"
+    >
+      <section
+        suppressHydrationWarning
+        className="relative border-b border-gray-800 bg-gradient-to-b from-gray-900 via-gray-900/50 to-gray-950 px-6 py-16 text-center"
+      >
+        <div
+          suppressHydrationWarning
+          className="mx-auto max-w-4xl space-y-4"
+        >
+          <span
+            suppressHydrationWarning
+            className="inline-block rounded-full bg-green-500/10 px-4 py-1.5 text-xs font-semibold text-green-400 border border-green-500/20"
+          >
             Сеть зарядных станций нового поколения
           </span>
-          <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">
+          <h1
+            suppressHydrationWarning
+            className="text-4xl font-extrabold tracking-tight sm:text-5xl"
+          >
             Заряжайте электромобиль <span className="text-green-400">просто и выгодно</span>
           </h1>
-          <p className="mx-auto max-w-2xl text-base text-gray-400">
+          <p
+            suppressHydrationWarning
+            className="mx-auto max-w-2xl text-base text-gray-400"
+          >
             Подключение через Type 2, быстрые порты DC или стандартную евророзетку 220V для вашего штатного зарядного кабеля. Прозрачная поминутная тарификация без переплат.
           </p>
 
-          <div className="mx-auto mt-8 max-w-3xl space-y-4">
+          <div
+            suppressHydrationWarning
+            className="mx-auto mt-8 max-w-3xl space-y-4"
+          >
             <input
               type="text"
               placeholder="Поиск по адресу или названию станции..."
@@ -154,7 +175,10 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-6 py-12">
+      <section
+        suppressHydrationWarning
+        className="mx-auto max-w-6xl px-6 py-12"
+      >
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-xl font-bold tracking-tight text-white">
             Доступные станции ({filteredStations.length})

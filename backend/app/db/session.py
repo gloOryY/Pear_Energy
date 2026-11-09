@@ -1,27 +1,25 @@
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from app.core.config import settings  # или откуда у вас берется DATABASE_URL
+from collections.abc import AsyncGenerator
 
-engine = create_async_engine(
-    settings.DATABASE_URL,  # Либо ваша переменная подключения
-    echo=False,
-    future=True
-)
+from redis.asyncio import Redis
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-# Обязательно объявляем async_session_maker (именно его ждет seed.py):
-async_session_maker = async_sessionmaker(
-    bind=engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-    autoflush=False
-)
+from app.core.config import settings
 
-# Если в других местах проекта использовалось старое имя AsyncSessionLocal:
-AsyncSessionLocal = async_session_maker
+engine = create_async_engine(settings.database_url, pool_pre_ping=True, echo=False)
+SessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+async_session_maker = SessionLocal
+AsyncSessionLocal = SessionLocal
 
-# Генератор сессий для FastAPI Depends (get_db):
-async def get_db():
-    async with async_session_maker() as session:
-        try:
-            yield session
-        finally:
-            await session.close()
+_redis: Redis | None = None
+
+
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    async with SessionLocal() as session:
+        yield session
+
+
+def get_redis() -> Redis:
+    global _redis
+    if _redis is None:
+        _redis = Redis.from_url(settings.REDIS_URL, decode_responses=True)
+    return _redis

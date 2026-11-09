@@ -10,17 +10,26 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
 from app.db.base import Base
-from app.db.session import SessionLocal, engine
+from app.db.session import SessionLocal, engine, get_redis
 from app.main import app
 from app.seed import seed
 
 
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def prepare_db():
+    redis = get_redis()
+    await redis.flushdb()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
     await seed()
+    yield
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def clean_redis():
+    redis = get_redis()
+    await redis.flushdb()
     yield
 
 
