@@ -12,6 +12,7 @@ export default function Header() {
 
   useEffect(() => {
     setMounted(true);
+
     const checkAuth = () => {
       const token = localStorage.getItem("token");
       const email = localStorage.getItem("userEmail");
@@ -107,7 +108,7 @@ export default function Header() {
             </div>
           )
         ) : (
-          <div className="w-48 h-9 bg-gray-700/60 animate-pulse rounded-lg ml-2" />
+          <div className="w-32 h-9" />
         )}
       </nav>
     </header>
