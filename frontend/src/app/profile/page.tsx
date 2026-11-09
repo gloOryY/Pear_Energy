@@ -54,6 +54,7 @@ export default function ProfilePage() {
   };
 
   return (
+    <div suppressHydrationWarning className="flex min-h-[calc(100vh-72px)] items-start justify-center bg-gray-900 p-4">
     <div className="flex min-h-[calc(100vh-72px)] items-start justify-center bg-gray-900 pt-12 p-4">
       <div className="w-full max-w-2xl p-8 bg-gray-800 rounded-2xl shadow-2xl border border-gray-700 text-white">
         
