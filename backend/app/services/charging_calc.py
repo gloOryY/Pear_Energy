@@ -1,5 +1,5 @@
-# backend/app/services/charging_calc.py
 from dataclasses import dataclass
+
 
 @dataclass
 class ChargingEstimate:
@@ -8,34 +8,37 @@ class ChargingEstimate:
     total_cost_rub: float
     effective_power_kw: float
 
+
 def calculate_charge_estimate(
     battery_capacity_kwh: float,
     current_soc: int,
     target_soc: int,
     station_power_kw: float,
     station_type: str,          # "AC" или "DC"
-    car_max_ac_kw: float,
-    car_max_dc_kw: float,
-    price_per_kwh: float,
-    efficiency: float = 0.92
+    car_max_ac_kw: float = 11.0,
+    car_max_dc_kw: float = 120.0,
+    price_per_kwh: float = 0.0,
+    price_per_minute: float = 0.0,
+    price_start: float = 0.0,
+    efficiency: float = 0.92,
 ) -> ChargingEstimate:
-    if target_soc <= current_soc:
+    if target_soc <= current_soc or battery_capacity_kwh <= 0:
         return ChargingEstimate(0.0, 0, 0.0, 0.0)
 
-    # 1. Полезная энергия, которую необходимо залить в ячейки
+    # 1. Полезная энергия, которую необходимо залить в батарею
     soc_delta_percent = target_soc - current_soc
     net_energy_kwh = battery_capacity_kwh * (soc_delta_percent / 100.0)
-    
-    # 2. Общая энергия от сети с учетом тепловых потерь и КПД
+
+    # 2. Общая энергия от сети с учетом тепловых потерь и КПД (~92%)
     gross_energy_kwh = net_energy_kwh / efficiency
 
-    # 3. Лимитирующая мощность (слабое звено)
-    car_power_limit = car_max_dc_kw if station_type.upper() == "DC" else car_max_ac_kw
-    effective_power_kw = min(station_power_kw, car_power_limit)
+    # 3. Лимитирующая мощность (минимум между станцией и авто)
+    is_dc = str(station_type).strip().upper() == "DC"
+    car_power_limit = (car_max_dc_kw if is_dc else car_max_ac_kw) or (120.0 if is_dc else 11.0)
+    effective_power_kw = max(1.0, min(float(station_power_kw or 22.0), float(car_power_limit)))
 
     # 4. Расчет времени с учетом замедления после 80% на DC
-    if station_type.upper() == "DC" and target_soc > 80:
-        # Разбиваем на отрезок до 80% и отрезок 80-100% (с понижением мощности в ~2 раза)
+    if is_dc and target_soc > 80:
         soc_up_to_80 = max(0, min(target_soc, 80) - current_soc)
         soc_above_80 = target_soc - max(current_soc, 80)
 
@@ -46,12 +49,20 @@ def calculate_charge_estimate(
     else:
         time_hours = gross_energy_kwh / effective_power_kw
 
-    duration_minutes = int(round(time_hours * 60))
-    total_cost_rub = round(gross_energy_kwh * price_per_kwh, 2)
+    duration_minutes = max(1, int(round(time_hours * 60)))
+
+    # 5. Расчет стоимости (поминутный тариф либо за кВт·ч)
+    if price_per_minute > 0:
+        total_cost_rub = round(price_start + (duration_minutes * price_per_minute), 2)
+    elif price_per_kwh > 0:
+        total_cost_rub = round(price_start + (gross_energy_kwh * price_per_kwh), 2)
+    else:
+        # Резервная оценка по среднему тарифу (15 ₽ / кВт·ч)
+        total_cost_rub = round(price_start + (gross_energy_kwh * 15.0), 2)
 
     return ChargingEstimate(
         energy_needed_kwh=round(gross_energy_kwh, 2),
         duration_minutes=duration_minutes,
         total_cost_rub=total_cost_rub,
-        effective_power_kw=effective_power_kw
+        effective_power_kw=round(effective_power_kw, 1),
     )

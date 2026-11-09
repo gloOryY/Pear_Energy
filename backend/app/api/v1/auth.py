@@ -47,6 +47,40 @@ async def register(data: RegisterIn, db: AsyncSession = Depends(get_db)):
                 password_hash=hash_password(data.password),
                 full_name=data.full_name, role=UserRole.driver)
     db.add(user)
+    await db.flush()
+
+    # Если пользователь указал автомобиль при регистрации:
+    if data.catalog_car_id:
+        from app.models.car import CarCatalog, UserCar
+        catalog_item = await db.get(CarCatalog, data.catalog_car_id)
+        if catalog_item:
+            db.add(UserCar(
+                user_id=user.id,
+                catalog_car_id=catalog_item.id,
+                make=catalog_item.make,
+                model=catalog_item.model,
+                battery_capacity_kwh=catalog_item.battery_capacity_kwh,
+                max_ac_power_kw=catalog_item.max_ac_power_kw,
+                max_dc_power_kw=catalog_item.max_dc_power_kw,
+                connector_type=catalog_item.connector_type,
+                is_custom=False,
+                is_active=True,
+            ))
+    elif data.custom_car_make and data.custom_car_battery_kwh:
+        from app.models.car import UserCar
+        db.add(UserCar(
+            user_id=user.id,
+            catalog_car_id=None,
+            make=data.custom_car_make.strip(),
+            model=(data.custom_car_model or "").strip() or "Standard",
+            battery_capacity_kwh=float(data.custom_car_battery_kwh),
+            max_ac_power_kw=11.0,
+            max_dc_power_kw=120.0,
+            connector_type=data.custom_car_connector or "GB/T",
+            is_custom=True,
+            is_active=True,
+        ))
+
     await db.commit()
     await db.refresh(user)
     return user

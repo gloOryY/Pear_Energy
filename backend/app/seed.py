@@ -88,9 +88,42 @@ SEED_STATIONS = [
 async def seed() -> None:
     now = datetime.now(timezone.utc)
     async with async_session_maker() as session:
+        # 1. Заполняем каталог автомобилей, если он пуст
+        from app.models.car import CarCatalog, UserCar
+        from app.services.car_catalog_data import CARS_CATALOG
+
+        has_cars = (await session.execute(select(CarCatalog).limit(1))).scalar_one_or_none()
+        if not has_cars:
+            for item in CARS_CATALOG:
+                session.add(CarCatalog(**item))
+            await session.commit()
+            print(f"Seed: каталог авто заполнен ({len(CARS_CATALOG)} моделей)!")
+
+        # 2. Проверяем наличие тестовых пользователей
+        driver_user = (await session.execute(select(User).where(User.email == "driver@example.com").limit(1))).scalar_one_or_none()
+        if driver_user:
+            has_user_car = (await session.execute(select(UserCar).where(UserCar.user_id == driver_user.id).limit(1))).scalar_one_or_none()
+            if not has_user_car:
+                first_cat = (await session.execute(select(CarCatalog).where(CarCatalog.make == "Zeekr").limit(1))).scalar_one_or_none()
+                if first_cat:
+                    session.add(UserCar(
+                        user_id=driver_user.id,
+                        catalog_car_id=first_cat.id,
+                        make=first_cat.make,
+                        model=first_cat.model,
+                        battery_capacity_kwh=first_cat.battery_capacity_kwh,
+                        max_ac_power_kw=first_cat.max_ac_power_kw,
+                        max_dc_power_kw=first_cat.max_dc_power_kw,
+                        connector_type=first_cat.connector_type,
+                        is_custom=False,
+                        is_active=True,
+                    ))
+                    await session.commit()
+
+        # 3. Проверяем наличие станций
         result = await session.execute(select(Station).limit(1))
         if result.scalar_one_or_none():
-            print("Seed: данные уже есть, пропускаем")
+            print("Seed: станции уже есть, пропускаем добавление станций")
             return
 
         # Проверяем / создаем базовых пользователей, если их нет

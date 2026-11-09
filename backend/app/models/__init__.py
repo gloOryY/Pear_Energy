@@ -9,10 +9,12 @@ from app.models.hardware import StationTelemetry, StationCommand
 from app.models.misc import (
     AuditLog, Review, StationPhoto, Favorite, Notification, SupportTicket, Setting,
 )
+from app.models.car import CarCatalog, UserCar
 
 __all__ = [c.__name__ for c in (
     User, Vehicle, Location, Station, Connector, ChargingSession,
     Payment, PaymentIntent, PaymentWebhook, Refund, Receipt, Booking,
     StationTelemetry, StationCommand, AuditLog, Review, StationPhoto,
     Favorite, Notification, SupportTicket, Setting,
+    CarCatalog, UserCar,
 )]

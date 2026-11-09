@@ -17,3 +17,4 @@ class User(Base, TimestampMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     vehicles = relationship("Vehicle", back_populates="user", cascade="all, delete-orphan", lazy="selectin")
+    cars = relationship("UserCar", back_populates="user", cascade="all, delete-orphan", lazy="selectin")
